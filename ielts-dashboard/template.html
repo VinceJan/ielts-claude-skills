@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IELTS 备考 Dashboard</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+    --text: #f1f5f9; --text2: #94a3b8; --accent: #3b82f6;
+    --green: #4ade80; --red: #f87171; --yellow: #fbbf24; --purple: #a78bfa;
+    --radius: 12px; --shadow: 0 4px 6px -1px rgba(0,0,0,.3);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.5px; }
+  .header p { color: var(--text2); margin-top: 4px; font-size: 0.9rem; }
+  .grid { display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px) { .grid-4, .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 0.85rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .metric { font-size: 2.2rem; font-weight: 700; line-height: 1.1; }
+  .metric-label { font-size: 0.8rem; color: var(--text2); margin-top: 4px; }
+  .trend-up { color: var(--green); } .trend-down { color: var(--red); } .trend-flat { color: var(--yellow); }
+  .progress-bar { background: var(--surface2); border-radius: 8px; height: 10px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 8px; transition: width .6s ease; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+  .tag-green { background: rgba(74,222,128,.15); color: var(--green); }
+  .tag-red { background: rgba(248,113,113,.15); color: var(--red); }
+  .tag-yellow { background: rgba(251,191,36,.15); color: var(--yellow); }
+  .error-list { list-style: none; }
+  .error-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface2); }
+  .error-list li:last-child { border-bottom: none; }
+  .timeline { position: relative; padding-left: 20px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: var(--surface2); }
+  .timeline-item { position: relative; margin-bottom: 12px; }
+  .timeline-item::before { content: ''; position: absolute; left: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .timeline-date { font-size: 0.75rem; color: var(--text2); }
+  .timeline-text { font-size: 0.85rem; }
+  .countdown { font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  canvas { max-height: 280px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📚 IELTS 备考 Dashboard</h1>
+  <p id="lastUpdate">数据更新于 --</p>
+</div>
+
+<!-- 顶部指标卡片 -->
+<div class="grid grid-4" style="margin-bottom:16px">
+  <div class="card" style="text-align:center">
+    <h2>目标分数</h2>
+    <div class="metric" style="color:var(--accent)" id="target">7.5</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <h2>当前分数</h2>
+    <div class="metric" id="current">6.5</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <h2>距考试</h2>
+    <div class="countdown" id="daysLeft">32</div>
+    <div class="metric-label">天</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <h2>已备考</h2>
+    <div class="metric" style="color:var(--purple)" id="daysStudied">28</div>
+    <div class="metric-label">天</div>
+  </div>
+</div>
+
+<!-- 四科雷达图 + 写作趋势 -->
+<div class="grid grid-2" style="margin-bottom:16px">
+  <div class="card">
+    <h2>四科雷达图</h2>
+    <canvas id="radar"></canvas>
+  </div>
+  <div class="card">
+    <h2>写作四维趋势</h2>
+    <canvas id="writingTrend"></canvas>
+  </div>
+</div>
+
+<!-- 阅读趋势 + 听力趋势 -->
+<div class="grid grid-2" style="margin-bottom:16px">
+  <div class="card">
+    <h2>阅读正确率趋势</h2>
+    <canvas id="readingTrend"></canvas>
+  </div>
+  <div class="card">
+    <h2>听力正确率趋势</h2>
+    <canvas id="listeningTrend"></canvas>
+  </div>
+</div>
+
+<!-- 错题分布 + 词汇进度 + 口语覆盖 -->
+<div class="grid grid-3" style="margin-bottom:16px">
+  <div class="card">
+    <h2>高频错误 Top 5</h2>
+    <canvas id="errorChart"></canvas>
+  </div>
+  <div class="card">
+    <h2>词汇掌握进度</h2>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <span class="metric" style="font-size:1.6rem" id="vocabMastered">89</span>
+      <span style="color:var(--text2)" id="vocabTotal">/ 156 词</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="vocabBar" style="width:57%;background:linear-gradient(90deg,var(--green),var(--accent))"></div></div>
+    <div style="margin-top:12px;font-size:0.85rem;color:var(--text2)">
+      <div>待复习：<span id="vocabReview" style="color:var(--yellow)">67</span> 词</div>
+      <div>同义替换：<span id="synCount" style="color:var(--purple)">89</span> 对</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>口语话题覆盖</h2>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <span class="metric" style="font-size:1.6rem" id="topicCovered">38</span>
+      <span style="color:var(--text2)" id="topicTotal">/ 50 话题</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="topicBar" style="width:76%;background:linear-gradient(90deg,var(--purple),var(--accent))"></div></div>
+    <div style="margin-top:12px;font-size:0.85rem;color:var(--text2)">
+      <div>万能故事：<span id="storyCount" style="color:var(--green)">5</span> / 5</div>
+    </div>
+  </div>
+</div>
+
+<!-- 高频错误详情 + 学习时间线 -->
+<div class="grid grid-2" style="margin-bottom:16px">
+  <div class="card">
+    <h2>错误详情</h2>
+    <ul class="error-list" id="errorList">
+      <li><span>介词搭配错误</span><span class="tag tag-red">12 次</span></li>
+      <li><span>T/F/NG 判断混淆</span><span class="tag tag-red">8 次</span></li>
+      <li><span>时态跳转</span><span class="tag tag-yellow">5 次</span></li>
+      <li><span>连接词过度使用</span><span class="tag tag-yellow">4 次</span></li>
+      <li><span>同义替换未识别</span><span class="tag tag-yellow">3 次</span></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>最近学习记录</h2>
+    <div class="timeline" id="timeline">
+      <div class="timeline-item"><div class="timeline-date">06-09</div><div class="timeline-text">阅读 C18T3P2 + 精读 <span class="tag tag-green">1h45m</span></div></div>
+      <div class="timeline-item"><div class="timeline-date">06-09</div><div class="timeline-text">词汇 15 新词 <span class="tag tag-green">45m</span></div></div>
+      <div class="timeline-item"><div class="timeline-date">06-08</div><div class="timeline-text">听力 C18T2S4 + 精听 <span class="tag tag-green">1h30m</span></div></div>
+      <div class="timeline-item"><div class="timeline-date">06-08</div><div class="timeline-text">写作 Task 2 批改 <span class="tag tag-green">1h</span></div></div>
+      <div class="timeline-item"><div class="timeline-date">06-07</div><div class="timeline-text">口语 Part 2 练习 <span class="tag tag-green">30m</span></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Chart.js 图表初始化
+// 注意：默认生产路径优先使用 ../ielts-core/scripts/ielts_data.py build-dashboard，
+// 生成无需外部网络依赖的 HTML。本模板适合用户明确要求交互图表且允许联网时使用。
+// ============================================================
+
+// ---------- 数据区（AI 生成时替换这里） ----------
+const DATA = {
+  profile: { target: 7.5, current: 6.5, examDate: '2026-08-15', startDate: '2026-05-15' },
+  scores: {
+    listening: [6.5, 7.0, 7.0, 7.5],
+    reading:   [6.0, 6.5, 7.0, 7.5],
+    writing:   [5.5, 6.0, 6.0, 6.5],
+    speaking:  [6.0, 6.0, 6.0, 6.5]
+  },
+  writingDetail: {
+    labels: ['第1次', '第2次', '第3次', '第4次'],
+    tr:  [5.5, 6.0, 6.0, 6.5],
+    cc:  [5.5, 5.5, 6.0, 6.0],
+    lr:  [6.0, 6.0, 6.5, 7.0],
+    gra: [5.5, 6.0, 6.0, 6.5]
+  },
+  readingAccuracy: [72, 75, 78, 82],
+  listeningAccuracy: [68, 72, 75, 80],
+  dates: ['05-25', '06-01', '06-08', '06-15'],
+  errors: {
+    labels: ['介词搭配', 'T/F/NG', '时态跳转', '连接词', '同义替换'],
+    values: [12, 8, 5, 4, 3]
+  },
+  vocab: { total: 156, mastered: 89 },
+  topics: { covered: 38, total: 50, stories: 5 }
+};
+
+// ---------- 更新顶部指标 ----------
+const today = new Date();
+const examDate = new Date(DATA.profile.examDate);
+const startDate = new Date(DATA.profile.startDate);
+document.getElementById('target').textContent = DATA.profile.target;
+document.getElementById('current').textContent = DATA.profile.current;
+document.getElementById('daysLeft').textContent = Math.max(0, Math.ceil((examDate - today) / 86400000));
+document.getElementById('daysStudied').textContent = Math.ceil((today - startDate) / 86400000);
+document.getElementById('lastUpdate').textContent = '数据更新于 ' + today.toLocaleDateString('zh-CN');
+
+// ---------- 词汇进度 ----------
+const vocabPct = Math.round(DATA.vocab.mastered / DATA.vocab.total * 100);
+document.getElementById('vocabMastered').textContent = DATA.vocab.mastered;
+document.getElementById('vocabTotal').textContent = '/ ' + DATA.vocab.total + ' 词';
+document.getElementById('vocabBar').style.width = vocabPct + '%';
+document.getElementById('vocabReview').textContent = DATA.vocab.total - DATA.vocab.mastered;
+document.getElementById('synCount').textContent = '89';
+
+// ---------- 口语进度 ----------
+const topicPct = Math.round(DATA.topics.covered / DATA.topics.total * 100);
+document.getElementById('topicCovered').textContent = DATA.topics.covered;
+document.getElementById('topicTotal').textContent = '/ ' + DATA.topics.total + ' 话题';
+document.getElementById('topicBar').style.width = topicPct + '%';
+document.getElementById('storyCount').textContent = DATA.topics.stories;
+
+// ---------- Chart.js 加载（联网增强模式） ----------
+const script = document.createElement('script');
+script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+script.onload = () => {
+  const C = Chart;
+  const gridColor = 'rgba(148,163,184,.15)';
+  const defaults = {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+    scales: {
+      x: { ticks: { color: '#94a3b8' }, grid: { color: gridColor } },
+      y: { ticks: { color: '#94a3b8' }, grid: { color: gridColor } }
+    }
+  };
+
+  // 雷达图
+  new C(document.getElementById('radar'), {
+    type: 'radar',
+    data: {
+      labels: ['听力', '阅读', '写作', '口语'],
+      datasets: [
+        { label: '当前', data: [DATA.scores.listening.at(-1), DATA.scores.reading.at(-1), DATA.scores.writing.at(-1), DATA.scores.speaking.at(-1)], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.15)', pointBackgroundColor: '#3b82f6' },
+        { label: '目标', data: [DATA.profile.target, DATA.profile.target, DATA.profile.target, DATA.profile.target], borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,.05)', pointBackgroundColor: '#f87171', borderDash: [5, 5] }
+      ]
+    },
+    options: { responsive: true, scales: { r: { beginAtZero: false, min: 4, max: 9, ticks: { stepSize: 1, color: '#94a3b8', backdropColor: 'transparent' }, grid: { color: gridColor }, pointLabels: { color: '#f1f5f9', font: { size: 12 } } } }, plugins: { legend: { labels: { color: '#94a3b8' } } } }
+  });
+
+  // 写作四维趋势
+  new C(document.getElementById('writingTrend'), {
+    type: 'line',
+    data: {
+      labels: DATA.writingDetail.labels,
+      datasets: [
+        { label: 'TR', data: DATA.writingDetail.tr, borderColor: '#3b82f6', tension: .3, pointRadius: 4 },
+        { label: 'CC', data: DATA.writingDetail.cc, borderColor: '#4ade80', tension: .3, pointRadius: 4 },
+        { label: 'LR', data: DATA.writingDetail.lr, borderColor: '#fbbf24', tension: .3, pointRadius: 4 },
+        { label: 'GRA', data: DATA.writingDetail.gra, borderColor: '#a78bfa', tension: .3, pointRadius: 4 }
+      ]
+    },
+    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, min: 5, max: 8, ticks: { ...defaults.scales.y.ticks, stepSize: 0.5 } } } }
+  });
+
+  // 阅读趋势
+  new C(document.getElementById('readingTrend'), {
+    type: 'line',
+    data: {
+      labels: DATA.dates,
+      datasets: [{ label: '正确率 %', data: DATA.readingAccuracy, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,.1)', fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: '#4ade80' }]
+    },
+    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, min: 60, max: 100 } } }
+  });
+
+  // 听力趋势
+  new C(document.getElementById('listeningTrend'), {
+    type: 'line',
+    data: {
+      labels: DATA.dates,
+      datasets: [{ label: '正确率 %', data: DATA.listeningAccuracy, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: '#3b82f6' }]
+    },
+    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, min: 60, max: 100 } } }
+  });
+
+  // 错误分布
+  new C(document.getElementById('errorChart'), {
+    type: 'bar',
+    data: {
+      labels: DATA.errors.labels,
+      datasets: [{ label: '次数', data: DATA.errors.values, backgroundColor: ['#f87171', '#fb923c', '#fbbf24', '#a78bfa', '#60a5fa'], borderRadius: 6, barThickness: 32 }]
+    },
+    options: { ...defaults, indexAxis: 'y', scales: { x: { ...defaults.scales.x, beginAtZero: true }, y: { ...defaults.scales.y, ticks: { ...defaults.scales.y.ticks, font: { size: 11 } } } }, plugins: { legend: { display: false } } }
+  });
+};
+document.head.appendChild(script);
+</script>
+</body>
+</html>
