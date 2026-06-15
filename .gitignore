@@ -8,3 +8,4 @@ Thumbs.db
 node_modules/
 .env
 .env.local
+视频字幕/
